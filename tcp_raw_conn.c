@@ -144,8 +144,8 @@ void create_ack_packet(struct sockaddr_in* src, struct sockaddr_in* dst, int32_t
         // TODO: TCP header configuration
         tcph->source = htons(src->sin_port);
         tcph->dest = htons(dst->sin_port);
-        tcph->seq = seq;
-        tcph->ack_seq = ack_seq;
+        tcph->seq = htonl(seq);
+        tcph->ack_seq = htonl(ack_seq);
         tcph->doff = 5;
         tcph->fin = 0;
         tcph->syn = 0;
