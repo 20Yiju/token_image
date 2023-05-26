@@ -211,65 +211,6 @@ int receive_from(int sock, char *buffer, size_t buffer_length, struct sockaddr_i
     return received;
 }
 
-void create_synack_packet(struct sockaddr_in *src, struct sockaddr_in *dst, int32_t seq, int32_t ack_seq, char **out_packet, int *out_packet_len)
-{
-    // datagram to represent the packet
-    char *datagram = calloc(DATAGRAM_LEN, sizeof(char));
-
-    // required structs for IP and TCP header
-    struct iphdr *iph = (struct iphdr *)datagram;
-    struct tcphdr *tcph = (struct tcphdr *)(datagram + sizeof(struct iphdr));
-    struct pseudo_header psh;
-
-    // TODO: IP header configuration
-    iph->ihl = 5;
-    iph->version = 4;
-    iph->tos = 0;
-    iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr);
-    iph->id = htonl(rand() % 65535); // id of this packet
-    iph->frag_off = 0;
-    iph->ttl = 60;
-    iph->protocol = 6;
-    iph->saddr = src->sin_addr.s_addr;
-    iph->daddr = dst->sin_addr.s_addr;
-
-    // TODO: TCP header configuration
-    tcph->source = htons(src->sin_port);
-    tcph->dest = htons(dst->sin_port);
-    tcph->seq = htonl(seq);
-    tcph->ack_seq = htonl(ack_seq);
-    tcph->doff = 5;
-    tcph->fin = 0;
-    tcph->syn = 1;
-    tcph->rst = 0;
-    tcph->psh = 0;
-    tcph->ack = 1;
-    tcph->urg = 0;
-    tcph->window = htons(5840);
-    tcph->urg_ptr = 0;
-
-    // TODO: TCP pseudo header for checksum calculation
-    psh.source_address = src->sin_addr.s_addr;
-    psh.dest_address = dst->sin_addr.s_addr;
-    psh.placeholder = 0;
-    psh.protocol = IPPROTO_TCP;
-    psh.tcp_length = htons(sizeof(struct tcphdr));
-    int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr);
-
-    // fill pseudo packet
-    char *pseudogram = malloc(psize);
-    memcpy(pseudogram, (char *)&psh, sizeof(struct pseudo_header));
-    memcpy(pseudogram + sizeof(struct pseudo_header), tcph, sizeof(struct tcphdr));
-
-    tcph->check = checksum((unsigned short *)pseudogram, psize);     // TODO: call checksum() with pseudogram
-    iph->check = checksum((unsigned short *)datagram, iph->tot_len); // TODO: call checksum() with datagram
-
-    *out_packet = datagram;
-    *out_packet_len = iph->tot_len;
-
-    free(pseudogram);
-}
-
 int main(int argc, char *argv[])
 {
     if (argc != 4)
@@ -331,15 +272,6 @@ int main(int argc, char *argv[])
         printf("Successfully sent %d bytes SYN!\n", sent);
     }
 
-    char *sa_packet;
-    int sa_packet_len;
-    int sa_sent;
-    create_synack_packet(&saddr, &daddr, &sa_packet, &sa_packet_len);
-    if ((sa_sent = sendto(sock, sa_packet, sa_packet_len, 0, (struct sockaddr *)&daddr, sizeof(struct sockaddr))) == -1)
-    {
-        perror("sendto()");
-        exit(EXIT_FAILURE);
-    }
     // Step 2. Receive SYN-ACK
     char recvbuf[DATAGRAM_LEN];
     int received = receive_from(sock, recvbuf, sizeof(recvbuf), &saddr);
