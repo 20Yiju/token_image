@@ -28,31 +28,34 @@ struct pseudo_header
 unsigned short checksum(unsigned short *buffer, unsigned short size)
 {
     unsigned short word16;
-    unsigned short sum = 0;
-    unsigned short i;
-
-    for (i = 0; i < size; i += 2)
+    unsigned long sum = 0;
+    int i;
+//    printf("%d\n", size);
+    for (i = 0; i < size/2; i += 1)
     {
-        word16 = ((buffer[i] << 8) & 0xFF00) + ((buffer[i + 1] << 8) & 0xFF00);
-        sum += word16;
-    }
+        //word16 = ((buffer[i] << 8) & 0xFF00) + ((buffer[i + 1] << 8) & 0xFF00);
+        sum += buffer[i];
 
-    while (sum >> 16)
+    }
+//    printf("%x\n", sum);
+
+    sum = (sum & 0xFFFF) + (sum >> 16);
+    /*while (sum >> 16)
     {
         sum = (sum & 0xFFFF) + (sum >> 16);
-    }
-
+    }*/
+ //   printf("%x\n", sum);
     sum = ~sum;
-
-    return sum;
+    printf("%lx\n", sum);
+    return (unsigned short)sum;
 }
 
 void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **out_packet, int *out_packet_len)
 {
     printf("iph->saddr: %d\n", src->sin_addr.s_addr);
     printf("iph->daddr: %d\n", dst->sin_addr.s_addr);
-    printf("src port: %d\n", src->sin_port);
-    printf("dst port: %d\n", dst->sin_port);
+    printf("src port: %d\n", ntohs(src->sin_port));
+    printf("dst port: %d\n", ntohs(dst->sin_port));
     // datagram to represent the packet
     char *datagram = calloc(DATAGRAM_LEN, sizeof(char));
 
@@ -78,10 +81,10 @@ void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **
     iph->daddr = dst->sin_addr.s_addr;
 
     // TODO: TCP header configuration
-    tcph->source = htons(src->sin_port);
-    tcph->dest = htons(dst->sin_port);
+    tcph->source = src->sin_port;
+    tcph->dest = dst->sin_port;
     tcph->seq = htonl((long)rand() % 4294967295);
-    tcph->ack_seq = 0; // SYN에서는 0을 사용하면 됨 -> 시작하는 것이닌깐
+    tcph->ack_seq = htonl(0); // SYN에서는 0을 사용하면 됨 -> 시작하는 것이닌깐
                        // doff Data Offset: tcp 헤더 사이즈를 32bits word 단위로 나타냄
     tcph->doff = 5; // 4bytes 단위로 data unit이 들어가니깐 5 x 4하기에 5
     tcph->fin = 0;
@@ -140,8 +143,8 @@ void create_ack_packet(struct sockaddr_in *src, struct sockaddr_in *dst, int32_t
     iph->daddr = dst->sin_addr.s_addr;
 
     // TODO: TCP header configuration
-    tcph->source = htons(src->sin_port);
-    tcph->dest = htons(dst->sin_port);
+    tcph->source = src->sin_port;
+    tcph->dest = dst->sin_port;
     tcph->seq = htonl(seq);
     tcph->ack_seq = htonl(ack_seq);
     tcph->doff = 5;
@@ -202,7 +205,7 @@ int receive_from(int sock, char *buffer, size_t buffer_length, struct sockaddr_i
     {
         received = recvfrom(sock, buffer, buffer_length, 0, NULL, NULL);
         // printf("received: %d\n", received);
-        if (received > 0)
+        if (received < 0)
             break;
         memcpy(&dst_port, buffer + 22, sizeof(dst_port));
     } while (dst_port != dst->sin_port);
